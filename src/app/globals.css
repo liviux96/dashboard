@@ -228,6 +228,105 @@ button {
   color: var(--muted);
 }
 
+.quick-actions {
+  margin-top: clamp(1.3rem, 1.2vw + 1rem, 2rem);
+  display: flex;
+  justify-content: center;
+}
+
+.quick-actions-track {
+  display: flex;
+  gap: clamp(0.7rem, 1.5vw, 1.1rem);
+  justify-content: center;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  width: min(100%, 960px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35rem 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(136, 110, 255, 0.45) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quick-actions-track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.quick-actions-track::-webkit-scrollbar-thumb {
+  background: rgba(109, 88, 214, 0.45);
+  border-radius: 999px;
+}
+
+.quick-actions-track::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.quick-action-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.55rem clamp(0.95rem, 1.8vw, 1.2rem);
+  min-height: 2.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(160, 132, 255, 0.42);
+  background: linear-gradient(135deg, rgba(76, 54, 166, 0.92), rgba(127, 101, 255, 0.85));
+  color: var(--fg);
+  font-size: clamp(0.78rem, 0.6vw + 0.7rem, 0.88rem);
+  font-weight: 600;
+  letter-spacing: 0.18px;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease,
+    border-color 160ms ease;
+  box-shadow: 0 14px 34px rgba(22, 6, 74, 0.46);
+}
+
+.quick-action-button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  border-color: rgba(184, 160, 255, 0.65);
+  box-shadow: 0 18px 40px rgba(33, 12, 105, 0.5);
+}
+
+.quick-action-button:active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+  box-shadow: 0 12px 30px rgba(22, 6, 74, 0.38);
+}
+
+.quick-action-button:focus-visible {
+  outline: none;
+  border-color: rgba(196, 176, 255, 0.75);
+  box-shadow:
+    0 0 0 3px rgba(123, 99, 255, 0.35),
+    0 18px 42px rgba(33, 12, 105, 0.52);
+}
+
+.quick-action-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  color: rgba(235, 228, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.quick-action-button span {
+  line-height: 1.1;
+}
+
+@media (max-width: 720px) {
+  .quick-actions {
+    justify-content: flex-start;
+  }
+
+  .quick-actions-track {
+    justify-content: flex-start;
+    margin: 0 auto;
+  }
+}
+
 :focus-visible {
   outline: 3px solid rgba(119, 90, 255, 0.65);
   outline-offset: 3px;
