@@ -2,26 +2,39 @@
 
 import { useEffect, useRef } from "react";
 
-const MAX_PARTICLES = 120;
-const MIN_PARTICLES = 80;
+const MAX_PARTICLES = 140;
+const MIN_PARTICLES = 100;
 
 const COLOR_PALETTE = [
-  { r: 206, g: 180, b: 255 }, // lavender
-  { r: 148, g: 247, b: 255 }, // cyan / mint
-  { r: 255, g: 153, b: 233 }, // magenta
-  { r: 255, g: 219, b: 173 }, // pale gold
+  { r: 125, g: 249, b: 255 }, // electric cyan
+  { r: 255, g: 44, b: 223 }, // magenta
+  { r: 155, g: 93, b: 229 }, // violet
+  { r: 45, g: 226, b: 230 }, // mint
+  { r: 253, g: 224, b: 71 }, // pale gold
 ];
+
+function randomParticleSize() {
+  const roll = Math.random();
+  if (roll > 0.82) {
+    return Math.random() * 1.5 + 3.5;
+  }
+  return Math.random() * 2 + 1;
+}
 
 function createParticles(count, width, height) {
   return Array.from({ length: count }, () => {
     const color = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 22 + 18; // px per second
     return {
       x: Math.random() * width,
       y: Math.random() * height,
-      size: Math.random() * 1.5 + 1,
-      velocityX: (Math.random() - 0.5) * 0.12,
-      velocityY: (Math.random() - 0.5) * 0.12,
-      alpha: Math.random() * 0.25 + 0.08,
+      size: randomParticleSize(),
+      velocityX: Math.cos(angle) * speed,
+      velocityY: Math.sin(angle) * speed,
+      twinkleDuration: Math.random() * 1.8 + 1.2,
+      twinkleOffset: Math.random() * Math.PI * 2,
+      glow: Math.random() * 10 + 14,
       color,
     };
   });
@@ -31,6 +44,7 @@ export default function ParticleBackground() {
   const canvasRef = useRef(null);
   const particlesRef = useRef([]);
   const frameRef = useRef();
+  const lastTimestampRef = useRef();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -67,14 +81,27 @@ export default function ParticleBackground() {
       }
     }
 
-    function step() {
+    function step(timestamp) {
+      if (!lastTimestampRef.current) {
+        lastTimestampRef.current = timestamp;
+      }
+
+      const deltaSeconds = Math.min(
+        (timestamp - lastTimestampRef.current) / 1000,
+        0.05,
+      );
+      lastTimestampRef.current = timestamp;
+
       const width = window.innerWidth;
       const height = window.innerHeight;
+      context.globalCompositeOperation = "source-over";
       context.clearRect(0, 0, width, height);
 
+      context.globalCompositeOperation = "lighter";
+
       particlesRef.current.forEach((particle) => {
-        particle.x += particle.velocityX;
-        particle.y += particle.velocityY;
+        particle.x += particle.velocityX * deltaSeconds;
+        particle.y += particle.velocityY * deltaSeconds;
 
         if (particle.x < -10) particle.x = width + 10;
         if (particle.x > width + 10) particle.x = -10;
@@ -82,10 +109,14 @@ export default function ParticleBackground() {
         if (particle.y > height + 10) particle.y = -10;
 
         const { r, g, b } = particle.color;
-        const fill = `rgba(${r}, ${g}, ${b}, ${particle.alpha})`;
+        const phase =
+          ((timestamp / 1000) / particle.twinkleDuration) * Math.PI * 2 +
+          particle.twinkleOffset;
+        const alpha = 0.4 + ((Math.sin(phase) + 1) / 2) * 0.6;
+        const fill = `rgba(${r}, ${g}, ${b}, ${alpha})`;
         context.beginPath();
-        context.shadowColor = `rgba(${r}, ${g}, ${b}, ${particle.alpha * 1.6})`;
-        context.shadowBlur = 12;
+        context.shadowColor = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        context.shadowBlur = particle.glow;
         context.fillStyle = fill;
         context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
         context.fill();
@@ -93,17 +124,19 @@ export default function ParticleBackground() {
 
       context.shadowBlur = 0;
       context.shadowColor = "transparent";
+      context.globalCompositeOperation = "source-over";
 
       frameRef.current = requestAnimationFrame(step);
     }
 
     resizeCanvas();
-    step();
+    frameRef.current = requestAnimationFrame(step);
     window.addEventListener("resize", resizeCanvas);
 
     return () => {
       cancelAnimationFrame(frameRef.current);
       window.removeEventListener("resize", resizeCanvas);
+      lastTimestampRef.current = undefined;
     };
   }, []);
 
