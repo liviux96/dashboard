@@ -4,11 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import ParticleBackground from "@/components/ParticleBackground";
-import { DEMO_CREDENTIALS, LOGIN_FLAG_KEY, USERNAME_KEY } from "@/utils/auth";
+import {
+  ACCESS_TOKEN_KEY,
+  LOGIN_FLAG_KEY,
+  REFRESH_TOKEN_KEY,
+  USERNAME_KEY,
+} from "@/utils/auth";
 import { sanitizeDisplayName } from "@/utils/text";
+import { signInWithEmailPassword } from "@/utils/supabase";
 
 const initialFormState = {
-  username: "",
+  email: "",
   password: "",
 };
 
@@ -16,6 +22,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [formState, setFormState] = useState(initialFormState);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -40,28 +47,57 @@ export default function LoginPage() {
     }
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    const trimmedUsername = formState.username.trim();
+    if (isSubmitting) {
+      return;
+    }
+
+    const trimmedEmail = formState.email.trim().toLowerCase();
     const password = formState.password;
 
-    if (!trimmedUsername || !password) {
-      setError("Please enter both username and password.");
+    if (!trimmedEmail || !password) {
+      setError("Please enter both email and password.");
       return;
     }
 
-    const isUsernameValid = trimmedUsername.toLowerCase() === DEMO_CREDENTIALS.username;
-    const isPasswordValid = password === DEMO_CREDENTIALS.password;
+    setIsSubmitting(true);
 
-    if (isUsernameValid && isPasswordValid) {
-      const safeName = sanitizeDisplayName(trimmedUsername) || "User";
+    try {
+      const { user, access_token: accessToken, refresh_token: refreshToken } =
+        await signInWithEmailPassword(trimmedEmail, password);
+
+      if (!accessToken) {
+        throw new Error("Supabase did not return an access token.");
+      }
+
+      const metadataName = sanitizeDisplayName(
+        user?.user_metadata?.display_name || user?.user_metadata?.full_name,
+      );
+      // TODO: Add a display name to the Supabase user profile via the Supabase dashboard.
+      const fallbackName =
+        metadataName ||
+        sanitizeDisplayName(user?.email?.split("@")[0]) ||
+        sanitizeDisplayName(trimmedEmail);
+      const safeName = fallbackName || "User";
+
       window.localStorage.setItem(LOGIN_FLAG_KEY, "true");
       window.localStorage.setItem(USERNAME_KEY, safeName);
-      router.replace("/dashboard");
-      return;
-    }
+      window.localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
 
-    setError("Invalid username or password. Try again.");
+      if (refreshToken) {
+        window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      } else {
+        window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+      }
+
+      router.replace("/dashboard");
+    } catch (submitError) {
+      console.error("Supabase sign-in failed:", submitError);
+      setError(submitError.message || "Invalid email or password. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -72,15 +108,15 @@ export default function LoginPage() {
           <h1 id="login-title">CVNS Dashboard Login</h1>
           <form onSubmit={handleSubmit} noValidate>
             <div className="form-group">
-              <label htmlFor="username">Username</label>
+              <label htmlFor="email">Email</label>
               <input
-                id="username"
-                name="username"
-                type="text"
-                autoComplete="username"
-                value={formState.username}
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={formState.email}
                 onChange={handleChange}
-                placeholder="Enter your username"
+                placeholder="Enter your email"
                 required
               />
             </div>
@@ -97,8 +133,8 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <button type="submit" className="primary-button">
-              Login
+            <button type="submit" className="primary-button" disabled={isSubmitting}>
+              {isSubmitting ? "Logging in..." : "Login"}
             </button>
             {error && (
               <p role="alert" className="error-message">

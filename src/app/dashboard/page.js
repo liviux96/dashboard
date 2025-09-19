@@ -4,8 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import ParticleBackground from "@/components/ParticleBackground";
-import { LOGIN_FLAG_KEY, USERNAME_KEY } from "@/utils/auth";
+import {
+  ACCESS_TOKEN_KEY,
+  LOGIN_FLAG_KEY,
+  REFRESH_TOKEN_KEY,
+  USERNAME_KEY,
+} from "@/utils/auth";
 import { getGreetingForDate } from "@/utils/time";
+import { sanitizeDisplayName } from "@/utils/text";
+import { getUser, signOut } from "@/utils/supabase";
 
 const iconProps = {
   xmlns: "http://www.w3.org/2000/svg",
@@ -114,21 +121,74 @@ export default function DashboardPage() {
   const [greeting, setGreeting] = useState(() => getGreetingForDate(new Date()));
   const [ready, setReady] = useState(false);
 
+  const clearSession = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.removeItem(LOGIN_FLAG_KEY);
+    window.localStorage.removeItem(USERNAME_KEY);
+    window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+    window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    const loggedIn = window.localStorage.getItem(LOGIN_FLAG_KEY) === "true";
-    const storedName = window.localStorage.getItem(USERNAME_KEY);
+    let isActive = true;
 
-    if (!loggedIn || !storedName) {
-      router.replace("/");
-      return;
-    }
+    const initialize = async () => {
+      const loggedIn = window.localStorage.getItem(LOGIN_FLAG_KEY) === "true";
+      const accessToken = window.localStorage.getItem(ACCESS_TOKEN_KEY);
 
-    setDisplayName(storedName);
-    setReady(true);
+      if (!loggedIn || !accessToken) {
+        clearSession();
+        router.replace("/");
+        return;
+      }
+
+      try {
+        const user = await getUser(accessToken);
+
+        if (!user) {
+          clearSession();
+          router.replace("/");
+          return;
+        }
+
+        const storedName = sanitizeDisplayName(
+          window.localStorage.getItem(USERNAME_KEY),
+        );
+        const metadataName = sanitizeDisplayName(
+          user?.user_metadata?.display_name || user?.user_metadata?.full_name,
+        );
+        const emailHandle = sanitizeDisplayName(user?.email?.split("@")[0]);
+        const safeName = metadataName || storedName || emailHandle || "User";
+
+        if (!storedName || storedName !== safeName) {
+          window.localStorage.setItem(USERNAME_KEY, safeName);
+        }
+
+        if (!isActive) {
+          return;
+        }
+
+        setDisplayName(safeName);
+        setReady(true);
+      } catch (error) {
+        console.error("Failed to validate Supabase session:", error);
+        clearSession();
+        router.replace("/");
+      }
+    };
+
+    initialize();
+
+    return () => {
+      isActive = false;
+    };
   }, [router]);
 
   useEffect(() => {
@@ -138,9 +198,18 @@ export default function DashboardPage() {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const handleLogout = () => {
-    window.localStorage.removeItem(LOGIN_FLAG_KEY);
-    window.localStorage.removeItem(USERNAME_KEY);
+  const handleLogout = async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const accessToken = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+    const refreshToken = window.localStorage.getItem(REFRESH_TOKEN_KEY);
+
+    await signOut(accessToken, refreshToken);
+
+    clearSession();
+
     router.replace("/");
   };
 
